@@ -23,6 +23,14 @@ std::string string_format( const std::string& format, Args ... args )
 
 //  ---------------------- Interface declaration ----------------------- 
 
+class IComplexNumber {
+    public:
+        virtual long getRealPart() = 0;
+        virtual string get_string() = 0;
+        virtual long getImaginaryPart() = 0;
+        virtual IComplexNumber* product(IComplexNumber* cx) = 0;
+};
+
 class IUniqueTable;
 
 class IComputeTable;
@@ -74,6 +82,59 @@ class IDD {
 };
 
 //  ------------------- Implementation of interfaces ------------------- 
+
+class ComplexNumber : public IComplexNumber {
+    // Constructors
+    public:
+        ComplexNumber() {
+            imaginary = 0;
+            real = 0;
+        }
+
+        ComplexNumber(long real) {
+            this->real = real;
+            imaginary = 0;
+        }
+
+        ComplexNumber(long real, long imaginary) {
+            this->imaginary = imaginary;
+            this->real = real;
+        }
+
+    // Methods
+    public:
+        long getRealPart() {
+            return this->real;
+        }
+
+        long getImaginaryPart() {
+            return this->imaginary;
+        }
+
+        string get_string() {
+            return std::to_string(this->real) + " + " + std::to_string(this->imaginary) + "i";
+        }
+
+        IComplexNumber* product(IComplexNumber* cx) {
+            long newReal = this->real * cx->getRealPart() - this->imaginary * cx->getImaginaryPart();
+            long newImaginary = this->real * cx->getImaginaryPart() + this->imaginary * cx->getRealPart();
+            return new ComplexNumber(newReal, newImaginary);
+        }
+
+    // Operators
+    public:
+
+        /*
+        operator std::string() const { 
+            return this->get_string();
+        }
+        */
+
+    // Internal vatiables
+    private:
+        long real;
+        long imaginary;
+};
 
 class UniqueTable : public IUniqueTable {
     // Constructors
@@ -724,6 +785,9 @@ int main() {
     auto ut = new UniqueTable();
     ut->insert(node);
     cout << "  # Node lookup table: " << ut->lookup(node)->getString() << "\n";
+    IComplexNumber* c = new ComplexNumber(3, -2);
+    c = c->product(new ComplexNumber(-4, 1));
+    cout << "  # C1 * C2: " << c->get_string() << "\n";                                                     // Expected result: -10 + 11i
     print(" Basics tested.\n");
 
     print(" Testing small product...");
