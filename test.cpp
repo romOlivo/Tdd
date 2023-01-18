@@ -25,6 +25,7 @@ std::string string_format( const std::string& format, Args ... args )
 
 class IComplexNumber {
     public:
+        virtual void normalize() = 0;
         virtual long getRealPart() = 0;
         virtual string get_string() = 0;
         virtual long getImaginaryPart() = 0;
@@ -42,21 +43,21 @@ class INode {
         virtual string getString() = 0;
         virtual IEdge* getLeftEdge() = 0;
         virtual IEdge* getRightEdge() = 0;
-        virtual long getProduct(long n) = 0;
-        virtual long getProductParallel(long n) = 0;
-        virtual IEdge* getDDProduct(long n, IUniqueTable* ut, IComputeTable* ct) = 0;
-        virtual IEdge* getDDProductParallel(long n, IUniqueTable* ut, IComputeTable* ct, int level) = 0;
-        virtual IEdge* getDDProductParallelCached(long n, IUniqueTable* ut, IComputeTable* ct, int level) = 0;
-        virtual IEdge* getDDProductParallelPrivate(long n, IUniqueTable* ut, IComputeTable* ct, int level) = 0;
+        virtual IComplexNumber* getProduct(IComplexNumber* n) = 0;
+        virtual IComplexNumber* getProductParallel(IComplexNumber* n) = 0;
+        virtual IEdge* getDDProduct(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct) = 0;
+        virtual IEdge* getDDProductParallel(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct, int level) = 0;
+        virtual IEdge* getDDProductParallelCached(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct, int level) = 0;
+        virtual IEdge* getDDProductParallelPrivate(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct, int level) = 0;
 };
 
 class IEdge {
     public:
-        virtual long getValue() = 0;
+        virtual IComplexNumber* getValue() = 0;
         virtual INode* getNode() = 0;
-        virtual long getProduct() = 0;
+        virtual IComplexNumber* getProduct() = 0;
         virtual string getString() = 0;
-        virtual long getProductParallel() = 0;
+        virtual IComplexNumber* getProductParallel() = 0;
         virtual IEdge* getDDProduct(IUniqueTable* ut, IComputeTable* ct) = 0;
         virtual IEdge* getDDProductParallel(IUniqueTable* ut, IComputeTable* ct) = 0;
         virtual IEdge* getDDProductParallelCached(IUniqueTable* ut, IComputeTable* ct) = 0;
@@ -88,17 +89,19 @@ class ComplexNumber : public IComplexNumber {
     public:
         ComplexNumber() {
             imaginary = 0;
-            real = 0;
+            real = 1;
         }
 
         ComplexNumber(long real) {
             this->real = real;
             imaginary = 0;
+            this->normalize();
         }
 
         ComplexNumber(long real, long imaginary) {
             this->imaginary = imaginary;
             this->real = real;
+            this->normalize();
         }
 
     // Methods
@@ -112,7 +115,13 @@ class ComplexNumber : public IComplexNumber {
         }
 
         string get_string() {
-            return std::to_string(this->real) + " + " + std::to_string(this->imaginary) + "i";
+            return std::to_string(this->real) + "+" + std::to_string(this->imaginary) + "i";
+        }
+
+        void normalize() {
+            //cout << this->get_string() << "\n";
+            this->real = this->real % MOD_NUMBER;
+            this->imaginary = this->imaginary % MOD_NUMBER;
         }
 
         IComplexNumber* product(IComplexNumber* cx) {
@@ -134,6 +143,8 @@ class ComplexNumber : public IComplexNumber {
     private:
         long real;
         long imaginary;
+        static const long MOD_NUMBER = 580608000 + 10000;
+        //static const long MOD_NUMBER = 11111;
 };
 
 class UniqueTable : public IUniqueTable {
@@ -145,6 +156,7 @@ class UniqueTable : public IUniqueTable {
     // Methods
     public:
         INode* lookup(INode* node) {
+            //return node;                                          // -------------------------------------------------- Deactivate
             omp_set_lock(&insertLock);
             INode* dev = node;
             std::size_t hashResult = std::hash<std::string>{}(node->getString());
@@ -237,6 +249,7 @@ class ComputeTable : public IComputeTable {
     // Methods
     public: 
         IEdge* lookup(IEdge* edge) {
+            //return nullptr;                                             // -------------------------------------------------- Deactivate
             //omp_set_lock(&insertLock);
             IEdge* dev = nullptr;
             std::size_t hashResult = std::hash<std::string>{}(edge->getString());
@@ -299,16 +312,21 @@ class Edge: public IEdge {
     public:
         Edge(long n, INode* node) {
             this->node = node;
+            this->n = new ComplexNumber(n);
+        }
+
+        Edge(IComplexNumber* n, INode* node) {
+            this->node = node;
             this->n = n;
         }
 
     // Interface methods
     public:
-        long getValue() {
-            return n;
+        IComplexNumber* getValue() {
+            return this->n;
         }
         
-        long getProduct() {
+        IComplexNumber* getProduct() {
             return node->getProduct(n);
         }
 
@@ -317,10 +335,10 @@ class Edge: public IEdge {
         }
 
         string getString() {
-            return  string_format("%i%i", n, node);
+            return  string_format("%s%i", n->get_string(), node);
         }
 
-        long getProductParallel() {
+        IComplexNumber* getProductParallel() {
             return node->getProductParallel(n);
         }
 
@@ -370,7 +388,7 @@ class Edge: public IEdge {
 
     private:
         INode* node;
-        long n;
+        IComplexNumber* n;
 };
 
 class Node : public INode {
@@ -395,19 +413,19 @@ class Node : public INode {
             return rightEdge;
         }
 
-        long getProduct(long n) {
-            long value = n;
+        IComplexNumber* getProduct(IComplexNumber* n) {
+            IComplexNumber* value = n;
             if (leftEdge != nullptr)
-                value = (value * leftEdge->getProduct()) % MOD_NUMBER;
+                value = value->product(leftEdge->getProduct());
             if (rightEdge != nullptr)
-                value = (value * rightEdge->getProduct()) % MOD_NUMBER;
+                value = value->product(rightEdge->getProduct());
             // std::this_thread::sleep_for(std::chrono::milliseconds(10));
             return value;
         }
 
-        long getProductParallel(long n) {
-            long leftValue = 1;
-            long rightValue = 1;
+        IComplexNumber* getProductParallel(IComplexNumber* n) {
+            IComplexNumber* leftValue = new ComplexNumber();
+            IComplexNumber* rightValue = new ComplexNumber();
             #pragma omp parallel num_threads(2) shared(leftValue, rightValue)
             {
                 #pragma omp single 
@@ -420,30 +438,30 @@ class Node : public INode {
                         rightValue = rightEdge->getProduct();
                 }
             }
-            return ((n * leftValue) % MOD_NUMBER * rightValue) % MOD_NUMBER;
+            return n->product(leftValue)->product(rightValue);
         }
 
-        IEdge* getDDProduct(long n, IUniqueTable* ut, IComputeTable* ct) {
-            long value = n;
+        IEdge* getDDProduct(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct) {
+            IComplexNumber* value = n;
             IEdge* leftEdge = nullptr;
             IEdge* rightEdge = nullptr;
             if (this->leftEdge != nullptr) {
                 leftEdge  = this->leftEdge->getDDProduct(ut, ct);
-                value = (value *  leftEdge->getValue()) % MOD_NUMBER;
+                value = value->product(leftEdge->getValue());
             }
             if (this->rightEdge != nullptr) {
                 rightEdge = this->rightEdge->getDDProduct(ut, ct);
-                value = (value * rightEdge->getValue()) % MOD_NUMBER;
+                value = value->product(rightEdge->getValue());
             }
             // std::this_thread::sleep_for(std::chrono::milliseconds(10));
             auto node = ut->lookup(new Node(leftEdge, rightEdge));
             return new Edge(value, node);
         }
 
-        IEdge* getDDProductParallel(long n, IUniqueTable* ut, IComputeTable* ct, int level) {
-            long value = n;
-            long leftValue = 1;
-            long rightValue = 1;
+        IEdge* getDDProductParallel(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct, int level) {
+            IComplexNumber* value = n;
+            IComplexNumber* leftValue = new ComplexNumber();
+            IComplexNumber* rightValue = new ComplexNumber();
             IEdge* leftEdge = nullptr;
             IEdge* rightEdge = nullptr;
             if (level == 0)
@@ -463,15 +481,17 @@ class Node : public INode {
                 }
             }
             #pragma omp taskwait
-            value = ((n * leftValue) % MOD_NUMBER * rightValue) % MOD_NUMBER;
+            #pragma omp flush
+            value = value->product(leftValue);
+            value = value->product(rightValue);
             auto node = ut->lookup(new Node(leftEdge, rightEdge));
             return new Edge(value, node);
         }
 
-        IEdge* getDDProductParallelCached(long n, IUniqueTable* ut, IComputeTable* ct, int level) {
-            long value = n;
-            long leftValue = 1;
-            long rightValue = 1;
+        IEdge* getDDProductParallelCached(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct, int level) {
+            IComplexNumber* value = n;
+            IComplexNumber* leftValue = new ComplexNumber();
+            IComplexNumber* rightValue = new ComplexNumber();
             IEdge* leftEdge = nullptr;
             IEdge* rightEdge = nullptr;
             if (level == 0)
@@ -492,15 +512,15 @@ class Node : public INode {
                 }
             }
             #pragma omp taskwait
-            value = ((n * leftValue) % MOD_NUMBER * rightValue) % MOD_NUMBER;
+            value = n->product(leftValue)->product(rightValue);
             auto node = ut->lookup(new Node(leftEdge, rightEdge));
             return new Edge(value, node);
         }
 
-        IEdge* getDDProductParallelPrivate(long n, IUniqueTable* ut, IComputeTable* ct, int level) {
-            long value = n;
-            long leftValue = 1;
-            long rightValue = 1;
+        IEdge* getDDProductParallelPrivate(IComplexNumber* n, IUniqueTable* ut, IComputeTable* ct, int level) {
+            IComplexNumber* value = n;
+            IComplexNumber* leftValue = new ComplexNumber();
+            IComplexNumber* rightValue = new ComplexNumber();
             IEdge* leftEdge = nullptr;
             IEdge* rightEdge = nullptr;
             if (level == 0)
@@ -520,7 +540,7 @@ class Node : public INode {
                 }
             }
             #pragma omp taskwait
-            value = ((n * leftValue) % MOD_NUMBER * rightValue) % MOD_NUMBER;
+            value = n->product(leftValue)->product(rightValue);
             auto node = ut->lookup(new Node(leftEdge, rightEdge));
             return new Edge(value, node);
         }
@@ -529,15 +549,18 @@ class Node : public INode {
             if (leftEdge == nullptr && rightEdge == nullptr)
                 return string_format("%i", nullptr);
             else
-                return  string_format("%i%i%i%i", 
-                                        leftEdge->getNode(), leftEdge->getValue(), 
-                                        rightEdge->getNode(), rightEdge->getValue());
+                return string_format("%i",  leftEdge->getNode()) + leftEdge->getValue()->get_string()
+                     + string_format("%i", rightEdge->getNode()) + rightEdge->getValue()->get_string();
+            /*
+                return  string_format("%i%s%i%s", 
+                                        leftEdge->getNode(), leftEdge->getValue()->get_string(), 
+                                        rightEdge->getNode(), rightEdge->getValue()->get_string());
+            */
         }
 
     private:
         IEdge *leftEdge;
         IEdge *rightEdge;
-        static const int MOD_NUMBER = 2147483648 - 1;
         // static const int MOD_NUMBER = pow(2, 30) - 1;
 
 };
@@ -561,20 +584,20 @@ class DD : public IDD {
             return headEdge;
         }
         
-        long getProduct() {
+        IComplexNumber* getProduct() {
             return headEdge->getProduct();
         }
 
-        long getProductParallel() {
+        IComplexNumber* getProductParallel() {
             return headEdge->getProductParallel();
         }
 
-        long getDDProduct() {
+        IComplexNumber* getDDProduct() {
             headEdge = headEdge->getDDProduct(ut, ct);
             return headEdge->getValue();
         }
 
-        long getDDProductParallel(int level) {
+        IComplexNumber* getDDProductParallel(int level) {
             #pragma omp parallel num_threads(12) shared(headEdge)
             {
                 #pragma omp single
@@ -585,7 +608,7 @@ class DD : public IDD {
             return headEdge->getValue();
         }
 
-        long getDDProductParallelCached(int level) {
+        IComplexNumber* getDDProductParallelCached(int level) {
             #pragma omp parallel num_threads(12) shared(headEdge)
             {
                 #pragma omp single
@@ -596,7 +619,7 @@ class DD : public IDD {
             return headEdge->getValue();
         }
 
-        long getDDProductParallelPrivate(int level) {
+        IComplexNumber* getDDProductParallelPrivate(int level) {
             #pragma omp parallel num_threads(12) shared(headEdge)
             {
                 #pragma omp single
@@ -618,6 +641,46 @@ class DD : public IDD {
 
 void print(string s) {
     cout << s << "\n";
+}
+
+DD* createControlatedDD() {
+    Edge*  leftNode1 = new Edge(1, new Node());
+    Edge* rightNode1 = new Edge(2, new Node());
+    Edge*  leftNode2 = new Edge(1, new Node());
+    Edge* rightNode2 = new Edge(3, new Node());
+    Edge*  leftNode3 = new Edge(1, new Node());
+    Edge* rightNode3 = new Edge(4, new Node());
+    Edge*  leftNode4 = new Edge(1, new Node());
+    Edge* rightNode4 = new Edge(5, new Node());
+    Edge*  leftNode5 = new Edge(1, new Node());
+    Edge* rightNode5 = new Edge(6, new Node());
+    Edge*  leftNode6 = new Edge(1, new Node());
+    Edge* rightNode6 = new Edge(7, new Node());
+    Edge*  leftNode7 = new Edge(1, new Node());
+    Edge* rightNode7 = new Edge(2, new Node());
+    Edge*  leftNode8 = new Edge(1, new Node());
+    Edge* rightNode8 = new Edge(3, new Node());
+
+    Edge*  leftNode1_1 = new Edge(1, new Node(leftNode1, rightNode1));
+    Edge* rightNode1_1 = new Edge(2, new Node(leftNode2, rightNode2));
+    Edge*  leftNode2_1 = new Edge(1, new Node(leftNode3, rightNode3));
+    Edge* rightNode2_1 = new Edge(2, new Node(leftNode4, rightNode4));
+    Edge*  leftNode3_1 = new Edge(1, new Node(leftNode5, rightNode5));
+    Edge* rightNode3_1 = new Edge(2, new Node(leftNode6, rightNode6));
+    Edge*  leftNode4_1 = new Edge(1, new Node(leftNode7, rightNode7));
+    Edge* rightNode4_1 = new Edge(2, new Node(leftNode8, rightNode8));
+    
+    Edge*  leftNode1_2 = new Edge(2, new Node(leftNode1_1, rightNode1_1));
+    Edge* rightNode1_2 = new Edge(10, new Node(leftNode2_1, rightNode2_1));
+    Edge*  leftNode2_2 = new Edge(5, new Node(leftNode3_1, rightNode3_1));
+    Edge* rightNode2_2 = new Edge(2, new Node(leftNode4_1, rightNode4_1));
+
+    Edge*  leftNode1_3 = new Edge(2, new Node(leftNode1_2, rightNode1_2));
+    Edge* rightNode1_3 = new Edge(3, new Node(leftNode2_2, rightNode2_2));
+
+    Edge* head = new Edge(10, new Node(leftNode1_3, rightNode1_3));
+
+    return new DD(head);  // Expected result: 580 608 000
 }
 
 DD* createSmallDD() {
@@ -661,19 +724,19 @@ DD* createSmallDD() {
 }
 
 DD* createLargeDD() {
-    int maxLevel = 19;
+    int maxLevel = 15;
     int N = pow(2, maxLevel);
     Edge *nodeArray[N];
 
     for(int i = 0; i < N; i++) {
-        nodeArray[i] = new Edge(i+1, new Node());
+        nodeArray[i] = new Edge(new ComplexNumber(i+1), new Node());
     }
 
     for (int level = 1; level < maxLevel; level++) {
         N = pow(2, maxLevel - level - 1);
         for(int i = 0; i < N; i++) {
             nodeArray[i] = new Edge(
-                pow(2, level) + i + 1, 
+                new ComplexNumber(pow(2, level) + i + 1, i), 
                 new Node(nodeArray[2*i], nodeArray[2*i+1])
             );
         }
@@ -729,7 +792,7 @@ void printSequentialRuns(DD* dd, int numIters) {
         auto start = chrono::high_resolution_clock::now();
         auto res = dd->getDDProduct();
         chrono::duration<double, std::milli> duration = chrono::high_resolution_clock::now() - start;
-        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res << "\n";
+        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
     }
 }
 
@@ -739,7 +802,7 @@ void printParallelRuns(DD* dd, int numIters, int level) {
         auto start = chrono::high_resolution_clock::now();
         auto res = dd->getDDProductParallel(level);
         chrono::duration<double, std::milli> duration = chrono::high_resolution_clock::now() - start;
-        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res << "\n";
+        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
     }
 }
 
@@ -749,7 +812,7 @@ void printParallelCachedRuns(DD* dd, int numIters, int level) {
         auto start = chrono::high_resolution_clock::now();
         auto res = dd->getDDProductParallelCached(level);
         chrono::duration<double, std::milli> duration = chrono::high_resolution_clock::now() - start;
-        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res << "\n";
+        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
     }
 }
 
@@ -759,7 +822,7 @@ void printParallelPrivateRuns(DD* dd, int numIters, int level) {
         auto start = chrono::high_resolution_clock::now();
         auto res = dd->getDDProductParallelPrivate(level);
         chrono::duration<double, std::milli> duration = chrono::high_resolution_clock::now() - start;
-        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res << "\n";
+        cout << "   --> Iter: " << i << "\t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
     }
 }
 
@@ -769,6 +832,8 @@ int main() {
     print("\n------- Start Program -------\n");
 
     print(" Generating DDs...");
+    DD* ddControlatedSequential = createControlatedDD();
+    DD* ddControlatedParallel = createControlatedDD();
     DD* ddSmallSequential = createSmallDD();
     DD* ddSmallParallel = createSmallDD();
     DD* ddLargeSequential = createLargeDD();
@@ -790,28 +855,42 @@ int main() {
     cout << "  # C1 * C2: " << c->get_string() << "\n";                                                     // Expected result: -10 + 11i
     print(" Basics tested.\n");
 
-    print(" Testing small product...");
-    long res;
+
+    print(" Testing controlated product...");
+    IComplexNumber* res;
     auto start = chrono::high_resolution_clock::now();
-    res = ddSmallSequential->getProduct();
+    res = ddControlatedSequential->getProduct();
     chrono::duration<double, std::milli> duration = chrono::high_resolution_clock::now() - start;
-    cout << "  # Sequential \t time: " << duration.count() << "\t result: " << res << "\n";
+    cout << "  # Sequential \t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
+    start = chrono::high_resolution_clock::now();
+    res = ddControlatedParallel->getProductParallel();
+    duration = chrono::high_resolution_clock::now() - start;
+    cout << "  # Parallel \t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
+    print(" Small controlated tested.\n");
+
+    print(" Testing small product...");
+    start = chrono::high_resolution_clock::now();
+    res = ddSmallSequential->getProduct();
+    duration = chrono::high_resolution_clock::now() - start;
+    cout << "  # Sequential \t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
     start = chrono::high_resolution_clock::now();
     res = ddSmallParallel->getProductParallel();
     duration = chrono::high_resolution_clock::now() - start;
-    cout << "  # Parallel \t time: " << duration.count() << "\t result: " << res << "\n";
+    cout << "  # Parallel \t time: " << duration.count() << "\t result: " << res->get_string() << "\n";
     print(" Small product tested.\n");
 
+    /*
     print(" Testing large product...");
     start = chrono::high_resolution_clock::now();
     res = ddLargeSequential->getProduct();
     duration = chrono::high_resolution_clock::now() - start;
-    cout << "  # Sequential \t time: " << duration.count() << "\t result: " << res << "\n";
+    cout << "  # Sequential \t time: " << duration.count() << "\t result: " << res->get_string()  << "\n";
     start = chrono::high_resolution_clock::now();
     res = ddLargeParallel->getProductParallel();
     duration = chrono::high_resolution_clock::now() - start;
-    cout << "  # Parallel \t time: " << duration.count() << "\t result: " << res << "\n";
+    cout << "  # Parallel \t time: " << duration.count() << "\t result: " << res->get_string()  << "\n";
     print(" Large product tested.\n");
+    */
 
     print(" Testing small DD product...");
     int TIMES = 7;
@@ -819,46 +898,25 @@ int main() {
     printParallelRuns(ddSmallParallel, TIMES, 1);
     print(" Small DD product tested.\n");
 
+    print(" Testing controlated DD product...");
+    printSequentialRuns(ddControlatedSequential, TIMES); 
+    printParallelRuns(ddControlatedParallel, TIMES, 1);
+    print(" Controlated DD product tested.\n");
+
+    int NLevels = 4;
     print(" Testing large DD product...");
-    level = 1;
-    printSequentialRuns(ddLargeSequential, TIMES);
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
+    for(level = 1; level < NLevels; level++) {
+        printf(" Testing large DD product with level %i...\n", level);
+        printSequentialRuns(ddLargeSequential, TIMES);
+        printParallelRuns(ddLargeParallel, TIMES, level);
+        printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
+        printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
+        print(" Large DD product tested.\n");
 
-    ddLargeParallel = createLargeDD();
-    ddLargeParallelCached = createLargeDD();
-    ddLargeParallelPrivate = createLargeDD();
-
-    print(" Testing large DD product with level 2...");
-    level = 2;
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
-
-    ddLargeParallel = createLargeDD();
-    ddLargeParallelCached = createLargeDD();
-    ddLargeParallelPrivate = createLargeDD();
-
-    print(" Testing large DD product with level 3...");
-    level = 3;
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
-
-    ddLargeParallel = createLargeDD();
-    ddLargeParallelCached = createLargeDD();
-    ddLargeParallelPrivate = createLargeDD();
-
-    print(" Testing large DD product with level 4...");
-    level = 4;
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
+        ddLargeParallel = createLargeDD();
+        ddLargeParallelCached = createLargeDD();
+        ddLargeParallelPrivate = createLargeDD();
+    }
 
    /*
 

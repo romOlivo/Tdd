@@ -752,47 +752,23 @@ int main() {
     printSequentialRuns(ddSmallSequential, TIMES); 
     printParallelRuns(ddSmallParallel, TIMES, 1);
     print(" Small DD product tested.\n");
+    
+    print(" Testing large DD product....");
+    N_levels = 4;
+    for (level = 1; level < N_levels; level++) {
+        printf(" Testing large DD product with level %i...", level);
+        printSequentialRuns(ddLargeSequential, TIMES);
+        printParallelRuns(ddLargeParallel, TIMES, level);
+        printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
+        printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
+        print(" Large DD product tested.\n");
 
-    print(" Testing large DD product...");
-    level = 1;
-    printSequentialRuns(ddLargeSequential, TIMES);
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
+        ddLargeParallel = createLargeDD();
+        ddLargeParallelCached = createLargeDD();
+        ddLargeParallelPrivate = createLargeDD();
+    }
 
-    ddLargeParallel = createLargeDD();
-    ddLargeParallelCached = createLargeDD();
-    ddLargeParallelPrivate = createLargeDD();
-
-    print(" Testing large DD product with level 2...");
-    level = 2;
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
-
-    ddLargeParallel = createLargeDD();
-    ddLargeParallelCached = createLargeDD();
-    ddLargeParallelPrivate = createLargeDD();
-
-    print(" Testing large DD product with level 3...");
-    level = 3;
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
-
-    ddLargeParallel = createLargeDD();
-    ddLargeParallelCached = createLargeDD();
-    ddLargeParallelPrivate = createLargeDD();
-
-    print(" Testing large DD product with level 4...");
-    level = 4;
-    printParallelRuns(ddLargeParallel, TIMES, level);
-    printParallelCachedRuns(ddLargeParallelCached, TIMES, level);
-    printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
-    print(" Large DD product tested.\n");
+    
 
    /*
 
