@@ -4,6 +4,7 @@
 using namespace std;
 
 #include "Edge.cpp"
+#include "Node.cpp"
 #include "Interfaces.cpp"
 #include "ComplexNumber.cpp"
 
@@ -17,11 +18,11 @@ class ComputeTable : public IComputeTable {
         }
     // Methods
     public: 
-        IEdge* lookup(IEdge* edge) {
+        IEdge* lookup(INode* node) {
             //return nullptr;                                             // -------------------------------------------------- Deactivate
             //omp_set_lock(&insertLock);
             IEdge* dev = nullptr;
-            std::size_t hashResult = std::hash<std::string>{}(edge->getString());
+            std::size_t hashResult = std::hash<std::string>{}(node->getString());
             if (table.find(hashResult) != table.end()) {
                 dev = table[hashResult];
             }
@@ -29,8 +30,8 @@ class ComputeTable : public IComputeTable {
             return dev;
         }
 
-        void insert(IEdge* inputEdge, IEdge* resultEdge) {
-            std::size_t hashResult = std::hash<std::string>{}(inputEdge->getString());
+        void insert(INode* inputNode, IEdge* resultEdge) {
+            std::size_t hashResult = std::hash<std::string>{}(inputNode->getString());
             #pragma omp task
             {
             omp_set_lock(&insertLock);
@@ -53,21 +54,21 @@ class CachedComputeTable : public IComputeTable {
         }
     // Methods
     public: 
-        IEdge* lookup(IEdge* edge) {
+        IEdge* lookup(INode* node) {
             IEdge* dev = nullptr;
-            auto s = edge->getString();
+            auto s = node->getString();
             if (table.find(s) != table.end()) {
                 dev = table[s];
             } else {
-                dev = ct->lookup(edge);
+                dev = ct->lookup(node);
                 table[s] = dev;
             }
             return dev;
         }
         
-        void insert(IEdge* inputEdge, IEdge* resultEdge) {
-            table[inputEdge->getString()] = resultEdge;
-            ct->insert(inputEdge, resultEdge);
+        void insert(INode* inputNode, IEdge* resultEdge) {
+            table[inputNode->getString()] = resultEdge;
+            ct->insert(inputNode, resultEdge);
         }
 
     private:

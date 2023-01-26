@@ -64,6 +64,6 @@ class ComplexNumber : public IComplexNumber {
         long real;
         long imaginary;
         static const long MOD_NUMBER = 580608000 + 10000;
-        //static const long MOD_NUMBER = 11111;
+        //static const long MOD_NUMBER =   7;
 };
 #endif

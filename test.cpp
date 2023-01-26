@@ -103,19 +103,19 @@ DD* createSmallDD() {
 }
 
 DD* createLargeDD() {
-    int maxLevel = 15;
+    int maxLevel = 16;
     int N = pow(2, maxLevel);
     Edge *nodeArray[N];
 
     for(int i = 0; i < N; i++) {
-        nodeArray[i] = new Edge(new ComplexNumber(i+1), new Node());
+        nodeArray[i] = new Edge(new ComplexNumber(i+1, 1), new Node());
     }
 
     for (int level = 1; level < maxLevel; level++) {
         N = pow(2, maxLevel - level - 1);
         for(int i = 0; i < N; i++) {
             nodeArray[i] = new Edge(
-                new ComplexNumber(pow(2, level) + i + 1, i), 
+                new ComplexNumber(level + 1, i), 
                 new Node(nodeArray[2*i], nodeArray[2*i+1])
             );
         }
@@ -292,6 +292,7 @@ int main() {
         printParallelPrivateRuns(ddLargeParallelPrivate, TIMES, level);
         print(" Large DD product tested.\n");
 
+        ddLargeSequential = createLargeDD();
         ddLargeParallel = createLargeDD();
         ddLargeParallelCached = createLargeDD();
         ddLargeParallelPrivate = createLargeDD();

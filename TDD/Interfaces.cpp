@@ -46,8 +46,8 @@ class IEdge {
 
 class IComputeTable {
     public:
-        virtual IEdge* lookup(IEdge* edge) = 0;
-        virtual void insert(IEdge* inputEdge, IEdge* resultEdge) = 0;
+        virtual IEdge* lookup(INode* node) = 0;
+        virtual void insert(INode* inputNode, IEdge* resultEdge) = 0;
 };
 
 class IUniqueTable {

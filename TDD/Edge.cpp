@@ -41,12 +41,12 @@ class Edge: public IEdge {
         }
 
         IEdge* getDDProduct(IUniqueTable* ut, IComputeTable* ct) {
-            IEdge* edge = ct->lookup(this);
+            IEdge* edge = ct->lookup(node);
             if (edge == nullptr) {
-                edge = node->getDDProduct(n, ut, ct);
-                ct->insert(this, edge);
+                edge = node->getDDProduct(new ComplexNumber(), ut, ct);
+                ct->insert(node, edge);
             }
-            return edge;
+            return new Edge(edge->getValue()->product(n), edge->getNode());
         }
 
         IEdge* getDDProductParallel(IUniqueTable* ut, IComputeTable* ct) {
@@ -54,12 +54,12 @@ class Edge: public IEdge {
         }
 
         IEdge* getDDProductParallel(IUniqueTable* ut, IComputeTable* ct, int level) {
-            IEdge* edge = ct->lookup(this);
+            IEdge* edge = ct->lookup(node);
             if (edge == nullptr) {
-                edge = node->getDDProductParallel(n, ut, ct, level);
-                ct->insert(this, edge);
+                edge = node->getDDProductParallel(new ComplexNumber(), ut, ct, level);
+                ct->insert(node, edge);
             }
-            return edge;
+            return new Edge(edge->getValue()->product(n), edge->getNode());
         }
 
         IEdge* getDDProductParallelCached(IUniqueTable* ut, IComputeTable* ct) {
@@ -67,21 +67,21 @@ class Edge: public IEdge {
         }
 
         IEdge* getDDProductParallelCached(IUniqueTable* ut, IComputeTable* ct, int level) {
-            IEdge* edge = ct->lookup(this);
+            IEdge* edge = ct->lookup(node);
             if (edge == nullptr) {
-                edge = node->getDDProductParallelCached(n, ut, ct, level);
-                ct->insert(this, edge);
+                edge = node->getDDProductParallelCached(new ComplexNumber(), ut, ct, level);
+                ct->insert(node, edge);
             }
-            return edge;
+            return new Edge(edge->getValue()->product(n), edge->getNode());
         }
 
         IEdge* getDDProductParallelPrivate(IUniqueTable* ut, IComputeTable* ct, int level) {
-            IEdge* edge = ct->lookup(this);
+            IEdge* edge = ct->lookup(node);
             if (edge == nullptr) {
-                edge = node->getDDProductParallelPrivate(n, ut, ct, level);
-                ct->insert(this, edge);
+                edge = node->getDDProductParallelPrivate(new ComplexNumber(), ut, ct, level);
+                ct->insert(node, edge);
             }
-            return edge;
+            return new Edge(edge->getValue()->product(n), edge->getNode());
         }
 
     private:
